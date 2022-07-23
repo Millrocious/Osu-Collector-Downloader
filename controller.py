@@ -1,5 +1,3 @@
-from pickle import APPEND
-from turtle import ht
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from bs4 import BeautifulSoup
@@ -7,16 +5,23 @@ import time
 import re
 import requests
 
+def get_filename_from_cd(cd):
+    """
+    Get filename from content-disposition
+    """
+    if not cd:
+        return None
+    fname = re.findall('filename=(.+)', cd)
+    if len(fname) == 0:
+        return None
+    return fname[0]
+
 # Initialize
 options = Options()
 options.headless = True
 options.add_argument('--user-agent="Mozilla/5.0 (Windows NT 6.1; WOW64; rv:50.0) Gecko/20100101 Firefox/50.0"')
-#driver = webdriver.Firefox(options=options)
+driver = webdriver.Firefox(options=options)
 
-driver = webdriver.Chrome(r"C:\Users\merda\Documents\python_pr\chromedriver.exe" )
-driver.get("http://www.google.com")
-
-# Get all url of beatmaps
 beatmaps = list()
 def parse_url_song(url, path):
     url_collection = url
@@ -43,28 +48,18 @@ def parse_url_song(url, path):
     time.sleep(SCROLL_PAUSE_TIME)
     page = driver.page_source
     soup = BeautifulSoup(page, "html.parser")
-    #print(page)
 
-    count = 0
-    for a in soup.findAll('a', href = re.compile(r'.*beatmaps.*')):
-        count += 1
-        time.sleep(SCROLL_PAUSE_TIME)
-        #https://api.chimu.moe/v1/download/
-        link = driver.get(a['href'])
-        time.sleep(0.3)
-        spage = driver.page_source
-        sp = BeautifulSoup(spage, 'html.parser')
-        song = sp.find_all('a', class_='beatmapset-header__details-text-link')
-        song_id = driver.current_url.split('/')[4].split('#')[0]
-        try:
-            print(f"{song_id} {song[1].text} - {song[0].text}.osz")
-            r = requests.get(f"https://api.chimu.moe/v1/download/{song_id}")  
-            with open(f'{path}{song_id} {song[1].text} - {song[0].text}.osz', 'wb') as f:
+    for a in soup.findAll('div', class_="mb-4"):
+        song = a.find('a', href = re.compile(r'.*beatmaps.*'))
+        time.sleep(0.1)
+        if song != None:
+            song_id = requests.get(song['href']).url.split('/')[4].split('#')[0];
+            print(f"{song_id}")
+            r = requests.get(f"https://kitsu.moe/api/d/{song_id}", allow_redirects=True)  
+            filename = get_filename_from_cd(r.headers.get('content-disposition')).replace('"', '')
+            with open(f'{path}{filename}', 'wb') as f:
                 f.write(r.content)
-        except:
-            print("Doesn't exist")
     
 if __name__ == "__main__":    
-    #parse_url_song("https://osucollector.com/collections/4518")
     parse_url_song("https://osucollector.com/collections/4515", r"C:\Users\merda\Documents\Osu_maps" + "\\")
     driver.quit()
